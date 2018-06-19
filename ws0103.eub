@@ -1,0 +1,177 @@
+% Watering-sonoff ver 1.3, GNU LGPL license, (C)2018 m.sillano
+% telnet: script http://192.168.43.242:85/www/sonoff/ws0103.eub 
+
+config @6 /msillanohome/hidro/1
+
+on init
+do
+setvar $tmp = (@8 * 1)
+if $tmp = 0 then
+% cool start
+setvar @1 = 0
+setvar @2 = 2
+setvar @3 = "01:00"
+setvar @4 = "02:00"
+setvar @5 = 2
+setvar @7 = 0
+endif
+% hot start
+setvar @8 = ($tmp + 1)
+setvar $cmt = @6 | "/command"
+setvar $set = @6 | "/set"
+subscribe local $cmt
+subscribe local $set
+% moisure
+gpio_pinmode 14 input
+setvar $ms = gpio_in(14)
+setvar $tmp = @6 | "/status/moisure"
+publish local $tmp "{\"Time\":\"" | $timestamp | "\",\"moisure\":" | $ms | "}" retained
+% watering restore
+setvar $tmp = @6 | "/status/watering"
+setvar $rs = json_parse("watering",retained_topic($tmp))
+if not($rs = 1) then
+setvar $rs = 0
+endif
+if @1 > 0 then
+setvar $rs = 1
+settimer 1 60000
+endif
+publish local $cmt "go"
+setalarm 3 @3
+setalarm 4 @4
+
+on mqttconnect
+do
+subscribe remote $cmt
+subscribe remote $set
+publish local $set "{\"data\":\"send\",\"value\":0}"
+publish local $cmt "send"
+
+on topic remote $set
+do
+println "on Remote Set " | $this_data
+publish local $set $this_data
+
+on topic remote $cmt
+do
+println "on Remote Command " | $this_data
+publish local $cmt $this_data
+
+on topic local $set
+do
+println "on Local Set " | $this_data
+setvar $tmp = json_parse("data",$this_data)
+if $tmp = "long" then
+setvar @2 = json_parse("value",$this_data) | "   "
+endif
+if $tmp = "when1" then
+setvar @3 = json_parse("value",$this_data)
+setalarm 3 @3
+endif
+if $tmp = "when2" then
+setvar @4 = json_parse("value",$this_data)
+setalarm 4 @4
+endif
+if $tmp = "mode" then
+setvar @5 = json_parse("value",$this_data)
+endif
+if $tmp = "reset" then
+system reset
+endif
+if $tmp = "timezone" then
+system "set ntp_timezone " | json_parse("value",$this_data)
+endif
+setvar $tmp = @6 | "/status/config"
+publish local $tmp "{\"run\":" | @8 | ",\"long\":" | @2 | ",\"tx\":[\"" | @3 | "\",\"" | @4 | "\"],\"mode\":" | @5 | "}" retained
+
+on topic local $cmt
+do
+println "on Local Command " | $this_data
+if $this_data = "on" then
+setvar $rs = 1
+endif
+if $this_data = "off" then
+setvar @1 = 0
+setvar $rs = 0
+endif
+if $this_data = "toggle" then
+setvar @1 = 0
+setvar $rs = not($rs)
+endif
+if (($this_data = "cycle")*($ms = 1)) > 0 then
+setvar $rs = 1
+setvar @1 = (@2 + 1)
+settimer 1 60000
+endif
+%  'go' set output and publish
+setvar $tmp = @6 | "/status/watering"
+if $this_data = "send" then
+publish local $tmp  retained_topic($tmp)
+setvar $tmp = @6 | "/status/moisure"
+publish local $tmp  retained_topic($tmp)
+else
+if (($rs = 1)*(@5 = 4)*($ms = 0)) = 0 then
+gpio_out 12 $rs
+gpio_out 13 not ($rs)
+else
+gpio_out 12 0
+gpio_out 13 1
+endif
+publish local $tmp "{\"Time\":\"" | $timestamp | "\",\"watering\":" | $rs | "}" retained
+endif
+
+on gpio_interrupt 0 pullup
+do
+println "New state GPIO 0: " | $this_gpio
+if $this_gpio = 0 then
+publish local $cmt "toggle"
+endif
+
+on gpio_interrupt 14 nopullup
+do
+println "New state GPIO 14: " | $this_gpio
+if $ms = not($this_gpio) then
+setvar $ms = $this_gpio
+setvar $tmp = @6 | "/status/moisure"
+publish local $tmp "{\"Time\":\"" | $timestamp | "\",\"moisure\":" | $ms | "}" retained
+if (($rs = 1)*(@5 = 4)) > 0 then
+gpio_out 12 $ms
+gpio_out 13 not($ms)
+endif
+endif
+
+on timer 1
+do
+println "on int timer1 " | @1
+if @1 > 0 then
+setvar @1 = (@1 - 1)
+settimer 1 60000
+endif
+if @1 = 1 then
+publish local $cmt "off"
+endif
+
+on alarm 3
+do
+println "on intT1"
+setvar @7 = not(@7*1)
+if ((@5 = 1)*(@7 = 1)) > 0 then
+publish local $cmt "cycle"
+endif
+if @5 > 1 then
+if @5 = 4 then
+publish local $cmt "on"
+else
+publish local $cmt "cycle"
+endif
+endif
+
+on alarm 4
+do
+println "on intT2"
+if @5 = 4 then
+publish local $cmt "off"
+endif
+if @5 = 3 then
+publish local $cmt "cycle"
+endif
