@@ -1,5 +1,4 @@
 # sonoff_watering
-Complete DIY project of an irrigation timer, better than many commercial timers
 
 Tired of changing the terrace irrigation timer every 2 years, I decided to design a timer: obviously IoT and based on MQTT. 
 
