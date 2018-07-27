@@ -1,5 +1,5 @@
-% Watering-sonoff ver 1.3, GNU LGPL license, (C)2018 m.sillano
-% telnet: script http://192.168.43.242:85/www/sonoff/ws0103.eub 
+% Watering-sonoff ver 01.03.2, GNU LGPL license, (C)2018 m.sillano
+% telnet: script http://192.168.178.23:85/www/sonoff/ws0103.eub
 
 config @6 /msillanohome/hidro/1
 
@@ -9,9 +9,9 @@ setvar $tmp = (@8 * 1)
 if $tmp = 0 then
 % cool start
 setvar @1 = 0
-setvar @2 = 2
+setvar @2 = 12
 setvar @3 = "01:00"
-setvar @4 = "02:00"
+setvar @4 = "03:00"
 setvar @5 = 2
 setvar @7 = 0
 endif
@@ -44,8 +44,8 @@ on mqttconnect
 do
 subscribe remote $cmt
 subscribe remote $set
-publish local $set "{\"data\":\"send\",\"value\":0}"
 publish local $cmt "send"
+publish local $set "{\"data\":\"send\",\"value\":0}"
 
 on topic remote $set
 do
@@ -134,26 +134,32 @@ if $ms = not($this_gpio) then
 setvar $ms = $this_gpio
 setvar $tmp = @6 | "/status/moisure"
 publish local $tmp "{\"Time\":\"" | $timestamp | "\",\"moisure\":" | $ms | "}" retained
-if (($rs = 1)*(@5 = 4)) > 0 then
-gpio_out 12 $ms
-gpio_out 13 not($ms)
-endif
 endif
 
 on timer 1
 do
 println "on int timer1 " | @1
 if @1 > 0 then
-setvar @1 = (@1 - 1)
+setvar @1 = (@1 - 1) | "  "
 settimer 1 60000
-endif
-if @1 = 1 then
+if 2 > @1 then
 publish local $cmt "off"
 endif
+endif
+
+on timer 2
+do
+println "on int timer2 " | $timestamp | " - " | $ms
+if (($rs = 1)*(@5 = 4)) > 0 then
+gpio_out 12 $ms
+gpio_out 13 not($ms)
+settimer 2 60000
+endif
+
 
 on alarm 3
 do
-println "on intT1"
+println "on alarm-T1"
 setvar @7 = not(@7*1)
 if ((@5 = 1)*(@7 = 1)) > 0 then
 publish local $cmt "cycle"
@@ -161,6 +167,7 @@ endif
 if @5 > 1 then
 if @5 = 4 then
 publish local $cmt "on"
+settimer 2 500
 else
 publish local $cmt "cycle"
 endif
@@ -168,7 +175,7 @@ endif
 
 on alarm 4
 do
-println "on intT2"
+println "on alarm-T2"
 if @5 = 4 then
 publish local $cmt "off"
 endif
