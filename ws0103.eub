@@ -143,34 +143,29 @@ publish local $cmt "off"
 endif
 endif
 
-on timer 2
-% mode 4 polling
-do
-println "on int timer2 " | $timestamp | " - " | $ms
-if (($rs = 1)*(@5 = 4)) > 0 then
-gpio_out 12 $ms
-gpio_out 13 not($ms)
-settimer 2 60013
-endif
-
 on timer 3
-% infinite polling moisure
 do
-if $t = 0 then
-gpio_out 1 1
-setvar $t = 1
-settimer 3 100
-
-else
+% infinite polling moisure
+if $t > 0 then
 println "on int timer3 " | $timestamp | " - " | gpio_in(14)
 if $ms = not( gpio_in(14)) then
 setvar $ms =  gpio_in(14)
 setvar $tmp = @6 | "/status/moisure"
 publish local $tmp "{\"Time\":\"" | $timestamp | "\",\"moisure\":" | $ms | "}" retained
 endif
+if (($rs = 1)*(@5 = 4)) > 0 then
+gpio_out 12 $ms
+gpio_out 13 not($ms)
+endif
+
 gpio_out 1 0
 setvar $t = 0
-settimer 3 1017
+settimer 3 60017
+
+else
+gpio_out 1 1
+setvar $t = 1
+settimer 3 100
 endif
 
 on alarm 3
@@ -183,7 +178,6 @@ endif
 if @5 > 1 then
 if @5 = 4 then
 publish local $cmt "on"
-settimer 2 500
 else
 publish local $cmt "cycle"
 endif
