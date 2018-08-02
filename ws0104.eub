@@ -1,0 +1,30 @@
+% Watering-sonoff - test polling ver 01.04, GNU LGPL license, (C)2018 m.sillano
+% telnet: script http://192.168.178.23:85/www/sonoff/ws0104.eub
+
+config system_output 0
+
+on init
+do
+setvar $t = 0
+gpio_pinmode 1 output
+settimer 3 3000
+
+on gpio_interrupt 14 nopullup 
+do
+% println " int pin 14 "
+
+on timer 3
+do
+if $t = 0 then
+gpio_out 1 1
+setvar $t = 1
+settimer 3 100
+
+else
+println " int timer3 " |gpio_in(14) 
+gpio_out 13 gpio_in(14)
+setvar $t = 0
+gpio_out 1 0
+settimer 3 200
+endif
+
