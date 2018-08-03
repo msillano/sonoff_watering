@@ -26,7 +26,7 @@ subscribe local $set
 gpio_pinmode 1 output
 setvar $ms = 0
 setvar $t = 0
-% watering restore
+% watering 
 setvar $tmp = @6 | "/status/watering"
 setvar $rs = json_parse("watering",retained_topic($tmp))
 if not($rs = 1) then
@@ -104,7 +104,6 @@ setvar $rs = 1
 setvar @1 = (@2 + 1)
 settimer 1 59999
 endif
-%  'go' set output and publish
 setvar $tmp = @6 | "/status/watering"
 if $this_data = "send" then
 publish local $tmp  retained_topic($tmp)
@@ -157,15 +156,23 @@ if (($rs = 1)*(@5 = 4)) > 0 then
 gpio_out 12 $ms
 gpio_out 13 not($ms)
 endif
-
 gpio_out 1 0
 setvar $t = 0
 settimer 3 60017
-
 else
 gpio_out 1 1
 setvar $t = 1
 settimer 3 100
+endif
+
+on alarm 4
+do
+println "on alarm-T2"
+if @5 = 4 then
+publish local $cmt "off"
+endif
+if @5 = 3 then
+publish local $cmt "cycle"
 endif
 
 on alarm 3
@@ -183,12 +190,3 @@ publish local $cmt "cycle"
 endif
 endif
 
-on alarm 4
-do
-println "on alarm-T2"
-if @5 = 4 then
-publish local $cmt "off"
-endif
-if @5 = 3 then
-publish local $cmt "cycle"
-endif
